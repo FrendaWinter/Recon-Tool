@@ -263,6 +263,7 @@ typedef enum {
 
 bool nob_mkdir_if_not_exists(const char *path);
 bool nob_copy_file(const char *src_path, const char *dst_path);
+bool nob_create_file(const char *src_path);
 bool nob_copy_directory_recursively(const char *src_path, const char *dst_path);
 bool nob_read_entire_dir(const char *parent, Nob_File_Paths *children);
 bool nob_write_entire_file(const char *path, const void *data, size_t size);
@@ -351,6 +352,48 @@ typedef struct {
 } Nob_String_Builder;
 
 bool nob_read_entire_file(const char *path, Nob_String_Builder *sb);
+
+typedef struct {
+    size_t count;
+    char **items;
+    size_t capacity;
+} Nob_String_Array;
+
+bool nob_readline_file(const char *filepath, Nob_String_Array *lines) {
+    FILE *file = fopen(filepath, "r");
+    if (!file) {
+        perror("fopen");
+        return false;
+    }
+
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    lines->count = 0;
+    lines->capacity = 0;
+    lines->items = NULL;
+
+    while ((read = getline(&line, &len, file)) != -1) {
+        // Remove newline character if present
+        if (read > 0 && line[read - 1] == '\n') {
+            line[--read] = '\0';
+        }
+        char *line_copy = strdup(line);
+        if (!line_copy) {
+            perror("strdup");
+            fclose(file);
+            free(line);
+            return false;
+        }
+        nob_da_append(lines, line_copy);
+    }
+
+    free(line);
+    fclose(file);
+    return true;
+}
+
 int nob_sb_appendf(Nob_String_Builder *sb, const char *fmt, ...) NOB_PRINTF_FORMAT(2, 3);
 
 // Append a sized buffer to a string builder
@@ -802,6 +845,17 @@ bool nob_mkdir_if_not_exists(const char *path)
     }
 
     nob_log(NOB_INFO, "created directory `%s`", path);
+    return true;
+}
+
+bool nob_create_file(const char *src_path)
+{
+    FILE *file = fopen(src_path, "w");
+    if (!file) {
+        perror("fopen");
+        return false;
+    }
+    fclose(file);
     return true;
 }
 
